@@ -1,26 +1,50 @@
-import * as core from '@actions/core'
-import { wait } from './wait'
+import * as core from '@actions/core';
+import * as exec from '@actions/exec';
+import { Installer } from './install';
+import * as fs from 'fs';
+import * as path from 'path';
 
-/**
- * The main function for the action.
- * @returns {Promise<void>} Resolves when the action is complete.
- */
-export async function run(): Promise<void> {
+async function run(): Promise<void> {
   try {
-    const ms: string = core.getInput('milliseconds')
+    // Get inputs
+    const version = core.getInput('version');
+    const policyPath = core.getInput('policy');
+    const output = core.getInput('output');
+    const exitOnError = core.getBooleanInput('exitOnError');
 
-    // Debug logs are only output if the `ACTIONS_STEP_DEBUG` secret is true
-    core.debug(`Waiting ${ms} milliseconds ...`)
+    // Install conftest
+    const installer = new Installer(version);
+    const conftestPath = await installer.install();
 
-    // Log the current timestamp, wait, then log the new timestamp
-    core.debug(new Date().toTimeString())
-    await wait(parseInt(ms, 10))
-    core.debug(new Date().toTimeString())
+    // Determine policy directory or fallback
+    let finalPolicyPath = policyPath;
+    if (!fs.existsSync(policyPath)) {
+      core.warning(`Policy directory '${policyPath}' not found. Falling back to default policy.`);
+      finalPolicyPath = path.join(__dirname, 'default_policy');
+    }
 
-    // Set outputs for other workflow steps to use
-    core.setOutput('time', new Date().toTimeString())
+    // Run conftest test command
+    const args = ['test', '.', '--policy', finalPolicyPath, '--output', output];
+    let exitCode = 0;
+    try {
+      await exec.exec(conftestPath, args);
+    } catch (error) {
+      core.error(`Conftest validation failed: ${error}`);
+      exitCode = 1;
+    }
+
+    // Handle exit on error
+    if (exitCode !== 0 && !exitOnError) {
+      core.setFailed('Conftest validation failed, but exitOnError is set to false. Returning success.');
+    } else if (exitCode !== 0) {
+      core.setFailed('Conftest validation failed.');
+    }
   } catch (error) {
-    // Fail the workflow run if an error occurs
-    if (error instanceof Error) core.setFailed(error.message)
+    if (error instanceof Error) {
+      core.setFailed(error.message);
+    }
   }
 }
+
+run();
+

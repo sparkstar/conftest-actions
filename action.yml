@@ -1,23 +1,23 @@
-name: 'The name of your action here'
-description: 'Provide a description here'
-author: 'Your name or organization here'
+name: 'Conftest'
+description: 'conftest action'
+author: 'sparkstar'
 
-# Add your action's branding here. This will appear on the GitHub Marketplace.
-branding:
-  icon: 'heart'
-  color: 'red'
-
-# Define your inputs here.
-inputs:
-  milliseconds:
-    description: 'Your input description here'
+inputs: 
+  version:
+    description: The version of `conftest` without v-prefix.
+    default: 0.56.0
+  files:
+    description: "Files for Conftest to test"
     required: true
-    default: '1000'
-
-# Define your outputs here.
-outputs:
-  time:
-    description: 'Your output description here'
+  policy:
+    description: "Where to find the policy folder or file"
+    default: "policy"
+  output:
+    description: "Output format for results"
+    default: "github"
+  exitOnError:
+    description: "return `1` when validation is failed"
+    default: false
 
 runs:
   using: node20
