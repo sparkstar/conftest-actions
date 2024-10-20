@@ -32713,7 +32713,7 @@ async function run() {
                 const lineNumber = getLineNumber(result['filename'], selector);
                 const conclusion = mapLevelToConclusion(warning);
                 await createAnnotation(warning['msg'], level, result['filename'], conclusion, lineNumber);
-                createWorkflowCommand(level, result['filename'], warning['msg']);
+                createWorkflowCommand(level, result['filename'], lineNumber, warning['msg']);
             }
         }
         if (result['failures']) {
@@ -32725,7 +32725,7 @@ async function run() {
                 const lineNumber = getLineNumber(result['filename'], selector);
                 const conclusion = mapLevelToConclusion(failure);
                 await createAnnotation(failure['msg'], level, result['filename'], conclusion, lineNumber);
-                createWorkflowCommand(level, result['filename'], failure['msg']);
+                createWorkflowCommand(level, result['filename'], lineNumber, failure['msg']);
             }
         }
     }
@@ -32760,12 +32760,12 @@ async function createAnnotation(message, level, filePath, conclusion, lineNumber
         });
     }
 }
-function createWorkflowCommand(level, filePath, message) {
+function createWorkflowCommand(level, filePath, lineNumber, message) {
     if (level === 'failure') {
-        console.log(`::error file=${filePath}::${message}`);
+        console.log(`::error file=${filePath},line=${lineNumber}::${message}`);
     }
     else if (level === 'warning') {
-        console.log(`::warning file=${filePath}::${message}`);
+        console.log(`::warning file=${filePath},line=${lineNumber}::${message}`);
     }
 }
 

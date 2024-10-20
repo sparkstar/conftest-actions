@@ -93,7 +93,12 @@ export async function run(): Promise<void> {
           conclusion,
           lineNumber
         )
-        createWorkflowCommand(level, result['filename'], warning['msg'])
+        createWorkflowCommand(
+          level,
+          result['filename'],
+          lineNumber,
+          warning['msg']
+        )
       }
     }
     if (result['failures']) {
@@ -111,7 +116,12 @@ export async function run(): Promise<void> {
           conclusion,
           lineNumber
         )
-        createWorkflowCommand(level, result['filename'], failure['msg'])
+        createWorkflowCommand(
+          level,
+          result['filename'],
+          lineNumber,
+          failure['msg']
+        )
       }
     }
   }
@@ -167,11 +177,12 @@ async function createAnnotation(
 function createWorkflowCommand(
   level: 'warning' | 'failure',
   filePath: string,
+  lineNumber: number,
   message: string
 ): void {
   if (level === 'failure') {
-    console.log(`::error file=${filePath}::${message}`)
+    console.log(`::error file=${filePath},line=${lineNumber}::${message}`)
   } else if (level === 'warning') {
-    console.log(`::warning file=${filePath}::${message}`)
+    console.log(`::warning file=${filePath},line=${lineNumber}::${message}`)
   }
 }
