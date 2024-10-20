@@ -1,8 +1,11 @@
+import * as fs from 'fs'
+
 import * as core from '@actions/core'
 import * as exec from '@actions/exec'
 import * as github from '@actions/github'
 
 import { Installer } from './install'
+import { YamlLineFinder } from './yamlparser'
 
 function mapLevelToConclusion(
   level: 'warnings' | 'failures'
@@ -66,18 +69,29 @@ export async function run(): Promise<void> {
   ```
   */
 
+  function getLineNumber(filePath: string, selector: string): number | null {
+    const yamlContent = fs.readFileSync(filePath, 'utf8')
+    const finder = new YamlLineFinder(yamlContent)
+    return finder.query(selector)
+  }
+
   // Parse JSON output and create annotations
   const results = JSON.parse(outputData)
   for (const result of results) {
     if (result['warnings']) {
       for (const warning of result['warnings']) {
         const level = 'warning'
+        const [selector, _] = warning['msg']
+          .split(':')
+          .map((part: string) => part.trim())
+        const lineNumber = getLineNumber(result['filename'], selector)
         const conclusion = mapLevelToConclusion(warning)
         await createAnnotation(
           warning['msg'],
           level,
           result['filename'],
-          conclusion
+          conclusion,
+          lineNumber
         )
         createWorkflowCommand(level, result['filename'], warning['msg'])
       }
@@ -85,12 +99,17 @@ export async function run(): Promise<void> {
     if (result['failures']) {
       for (const failure of result['failures']) {
         const level = 'failure'
+        const [selector, _] = failure['msg']
+          .split(':')
+          .map((part: string) => part.trim())
+        const lineNumber = getLineNumber(result['filename'], selector)
         const conclusion = mapLevelToConclusion(failure)
         await createAnnotation(
           failure['msg'],
           level,
           result['filename'],
-          conclusion
+          conclusion,
+          lineNumber
         )
         createWorkflowCommand(level, result['filename'], failure['msg'])
       }
@@ -110,7 +129,8 @@ async function createAnnotation(
     | 'success'
     | 'skipped'
     | 'stale'
-    | 'timed_out'
+    | 'timed_out',
+  lineNumber: number | null
 ): Promise<void> {
   const { context } = github
   const { pull_request } = context.payload
@@ -132,8 +152,8 @@ async function createAnnotation(
         annotations: [
           {
             path: filePath,
-            start_line: 1,
-            end_line: 1,
+            start_line: lineNumber || 1,
+            end_line: lineNumber || 1,
             annotation_level: level,
             message
           }
