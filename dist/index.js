@@ -32697,17 +32697,21 @@ async function run() {
     // Parse JSON output and create annotations
     const results = JSON.parse(outputData);
     for (const result of results) {
-        for (const warning of result['warnings']) {
-            const level = 'warning';
-            const conclusion = mapLevelToConclusion(warning);
-            await createAnnotation(warning['msg'], level, result['filename'], conclusion);
-            createWorkflowCommand(level, result['filename'], warning['msg']);
+        if (result['warnings']) {
+            for (const warning of result['warnings']) {
+                const level = 'warning';
+                const conclusion = mapLevelToConclusion(warning);
+                await createAnnotation(warning['msg'], level, result['filename'], conclusion);
+                createWorkflowCommand(level, result['filename'], warning['msg']);
+            }
         }
-        for (const failure of result['failures']) {
-            const level = 'failure';
-            const conclusion = mapLevelToConclusion(failure);
-            await createAnnotation(failure['msg'], level, result['filename'], conclusion);
-            createWorkflowCommand(level, result['filename'], failure['msg']);
+        if (result['failures']) {
+            for (const failure of result['failures']) {
+                const level = 'failure';
+                const conclusion = mapLevelToConclusion(failure);
+                await createAnnotation(failure['msg'], level, result['filename'], conclusion);
+                createWorkflowCommand(level, result['filename'], failure['msg']);
+            }
         }
     }
 }
