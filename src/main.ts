@@ -75,7 +75,8 @@ export async function run(): Promise<void> {
     return finder.query(selector)
   }
 
-  // Parse JSON output and create annotations
+  let validations: string[] = []
+  validations.push(`::gruop::Validation results`)
   const results = JSON.parse(outputData)
   for (const result of results) {
     if (result['warnings']) {
@@ -85,20 +86,13 @@ export async function run(): Promise<void> {
           .split(':')
           .map((part: string) => part.trim())
         const lineNumber = getLineNumber(result['filename'], selector)
-        const conclusion = mapLevelToConclusion(warning)
-        await createAnnotation(
-          warning['msg'],
-          level,
-          result['filename'],
-          conclusion,
-          lineNumber
-        )
-        createWorkflowCommand(
+        const validation = createWorkflowCommand(
           level,
           result['filename'],
           lineNumber,
           warning['msg']
         )
+        validations.push(validation)
       }
     }
     if (result['failures']) {
@@ -108,25 +102,20 @@ export async function run(): Promise<void> {
           .split(':')
           .map((part: string) => part.trim())
         const lineNumber = getLineNumber(result['filename'], selector)
-        const conclusion = mapLevelToConclusion(failure)
-        await createAnnotation(
-          failure['msg'],
-          level,
-          result['filename'],
-          conclusion,
-          lineNumber
-        )
-        createWorkflowCommand(
+        const validation = createWorkflowCommand(
           level,
           result['filename'],
           lineNumber,
           failure['msg']
         )
+        validations.push(validation)
       }
     }
   }
+  validations.push(`::endgroup::`)
 }
 
+// how to use?
 async function createAnnotation(
   message: string,
   level: 'notice' | 'warning' | 'failure',
@@ -179,10 +168,10 @@ function createWorkflowCommand(
   filePath: string,
   lineNumber: number,
   message: string
-): void {
+): string {
   if (level === 'failure') {
-    console.log(`::error file=${filePath},line=${lineNumber}::${message}`)
-  } else if (level === 'warning') {
-    console.log(`::warning file=${filePath},line=${lineNumber}::${message}`)
+    return `::error file=${filePath},line=${lineNumber}::${message}`
   }
+  // else if (level === 'warning') {
+  return `::warning file=${filePath},line=${lineNumber}::${message}`
 }

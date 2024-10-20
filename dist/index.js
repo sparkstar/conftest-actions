@@ -32701,7 +32701,8 @@ async function run() {
         const finder = new yamlparser_1.YamlLineFinder(yamlContent);
         return finder.query(selector);
     }
-    // Parse JSON output and create annotations
+    let validations = [];
+    validations.push(`::gruop::Validation results`);
     const results = JSON.parse(outputData);
     for (const result of results) {
         if (result['warnings']) {
@@ -32711,9 +32712,8 @@ async function run() {
                     .split(':')
                     .map((part) => part.trim());
                 const lineNumber = getLineNumber(result['filename'], selector);
-                const conclusion = mapLevelToConclusion(warning);
-                await createAnnotation(warning['msg'], level, result['filename'], conclusion, lineNumber);
-                createWorkflowCommand(level, result['filename'], lineNumber, warning['msg']);
+                const validation = createWorkflowCommand(level, result['filename'], lineNumber, warning['msg']);
+                validations.push(validation);
             }
         }
         if (result['failures']) {
@@ -32723,13 +32723,14 @@ async function run() {
                     .split(':')
                     .map((part) => part.trim());
                 const lineNumber = getLineNumber(result['filename'], selector);
-                const conclusion = mapLevelToConclusion(failure);
-                await createAnnotation(failure['msg'], level, result['filename'], conclusion, lineNumber);
-                createWorkflowCommand(level, result['filename'], lineNumber, failure['msg']);
+                const validation = createWorkflowCommand(level, result['filename'], lineNumber, failure['msg']);
+                validations.push(validation);
             }
         }
     }
+    validations.push(`::endgroup::`);
 }
+// how to use?
 async function createAnnotation(message, level, filePath, conclusion, lineNumber) {
     const { context } = github;
     const { pull_request } = context.payload;
@@ -32762,11 +32763,10 @@ async function createAnnotation(message, level, filePath, conclusion, lineNumber
 }
 function createWorkflowCommand(level, filePath, lineNumber, message) {
     if (level === 'failure') {
-        console.log(`::error file=${filePath},line=${lineNumber}::${message}`);
+        return `::error file=${filePath},line=${lineNumber}::${message}`;
     }
-    else if (level === 'warning') {
-        console.log(`::warning file=${filePath},line=${lineNumber}::${message}`);
-    }
+    // else if (level === 'warning') {
+    return `::warning file=${filePath},line=${lineNumber}::${message}`;
 }
 
 
