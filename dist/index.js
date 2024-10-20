@@ -32734,7 +32734,7 @@ async function createAnnotation(message, level, filePath, conclusion, lineNumber
     const { context } = github;
     const { pull_request } = context.payload;
     if (pull_request) {
-        console.log(lineNumber);
+        console.log(`${level} - ${filePath}, ${message} - ${lineNumber}`);
         const octokit = github.getOctokit(core.getInput('github_token'));
         const owner = context.repo.owner;
         const repo = context.repo.repo;
