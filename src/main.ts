@@ -69,7 +69,7 @@ export async function run(): Promise<void> {
   ```
   */
 
-  function getLineNumber(filePath: string, selector: string): number | null {
+  function getLineNumber(filePath: string, selector: string): number {
     const yamlContent = fs.readFileSync(filePath, 'utf8')
     const finder = new YamlLineFinder(yamlContent)
     return finder.query(selector)
@@ -130,12 +130,13 @@ async function createAnnotation(
     | 'skipped'
     | 'stale'
     | 'timed_out',
-  lineNumber: number | null
+  lineNumber: number
 ): Promise<void> {
   const { context } = github
   const { pull_request } = context.payload
 
   if (pull_request) {
+    console.log(lineNumber)
     const octokit = github.getOctokit(core.getInput('github_token'))
     const owner = context.repo.owner
     const repo = context.repo.repo
@@ -152,8 +153,8 @@ async function createAnnotation(
         annotations: [
           {
             path: filePath,
-            start_line: lineNumber || 1,
-            end_line: lineNumber || 1,
+            start_line: lineNumber,
+            end_line: lineNumber,
             annotation_level: level,
             message
           }

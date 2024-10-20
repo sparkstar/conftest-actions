@@ -13,7 +13,7 @@ export class YamlLineFinder {
   }
 
   // https://github.com/eemeli/yaml/discussions/376
-  public query(selector: string): number | null {
+  public query(selector: string): number {
     const keys = selector
       .split('.')
       .map(key => {
@@ -33,7 +33,7 @@ export class YamlLineFinder {
     }
 
     console.error(`Selector '${selector}' not found or range not available.`)
-    return null
+    return 1
   }
 }
 

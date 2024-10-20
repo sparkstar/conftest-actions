@@ -32734,6 +32734,7 @@ async function createAnnotation(message, level, filePath, conclusion, lineNumber
     const { context } = github;
     const { pull_request } = context.payload;
     if (pull_request) {
+        console.log(lineNumber);
         const octokit = github.getOctokit(core.getInput('github_token'));
         const owner = context.repo.owner;
         const repo = context.repo.repo;
@@ -32749,8 +32750,8 @@ async function createAnnotation(message, level, filePath, conclusion, lineNumber
                 annotations: [
                     {
                         path: filePath,
-                        start_line: lineNumber || 1,
-                        end_line: lineNumber || 1,
+                        start_line: lineNumber,
+                        end_line: lineNumber,
                         annotation_level: level,
                         message
                     }
@@ -32830,7 +32831,7 @@ class YamlLineFinder {
             return startLinePos.line;
         }
         console.error(`Selector '${selector}' not found or range not available.`);
-        return null;
+        return 1;
     }
 }
 exports.YamlLineFinder = YamlLineFinder;
