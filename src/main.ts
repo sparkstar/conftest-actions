@@ -113,6 +113,9 @@ export async function run(): Promise<void> {
     }
   }
   validations.push(`::endgroup::`)
+  for (const validation of validations) {
+    console.log(validation)
+  }
 }
 
 // how to use?

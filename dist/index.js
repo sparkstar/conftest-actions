@@ -32729,6 +32729,9 @@ async function run() {
         }
     }
     validations.push(`::endgroup::`);
+    for (const validation of validations) {
+        console.log(validation);
+    }
 }
 // how to use?
 async function createAnnotation(message, level, filePath, conclusion, lineNumber) {
