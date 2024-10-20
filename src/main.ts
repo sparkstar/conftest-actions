@@ -1,50 +1,152 @@
-import * as core from '@actions/core';
-import * as exec from '@actions/exec';
-import { Installer } from './install';
-import * as fs from 'fs';
-import * as path from 'path';
+import * as core from '@actions/core'
+import * as exec from '@actions/exec'
+import * as github from '@actions/github'
 
-async function run(): Promise<void> {
+import { Installer } from './install'
+
+function mapLevelToConclusion(
+  level: 'warnings' | 'failures'
+):
+  | 'action_required'
+  | 'cancelled'
+  | 'failure'
+  | 'neutral'
+  | 'success'
+  | 'skipped'
+  | 'stale'
+  | 'timed_out' {
+  switch (level) {
+    case 'warnings':
+      return 'neutral'
+    case 'failures':
+      return 'failure'
+    default:
+      return 'neutral'
+  }
+}
+
+export async function run(): Promise<void> {
+  const dirs = core.getInput('dirs')
+  const version = core.getInput('version')
+  const policyPath = core.getInput('policy')
+
+  const installer = new Installer(version)
+  const conftestPath = await installer.install()
+
+  const args = ['test', '--policy', policyPath, '--output', 'json', dirs]
+  let outputData = ''
+
   try {
-    // Get inputs
-    const version = core.getInput('version');
-    const policyPath = core.getInput('policy');
-    const output = core.getInput('output');
-    const exitOnError = core.getBooleanInput('exitOnError');
-
-    // Install conftest
-    const installer = new Installer(version);
-    const conftestPath = await installer.install();
-
-    // Determine policy directory or fallback
-    let finalPolicyPath = policyPath;
-    if (!fs.existsSync(policyPath)) {
-      core.warning(`Policy directory '${policyPath}' not found. Falling back to default policy.`);
-      finalPolicyPath = path.join(__dirname, 'default_policy');
-    }
-
-    // Run conftest test command
-    const args = ['test', '.', '--policy', finalPolicyPath, '--output', output];
-    let exitCode = 0;
-    try {
-      await exec.exec(conftestPath, args);
-    } catch (error) {
-      core.error(`Conftest validation failed: ${error}`);
-      exitCode = 1;
-    }
-
-    // Handle exit on error
-    if (exitCode !== 0 && !exitOnError) {
-      core.setFailed('Conftest validation failed, but exitOnError is set to false. Returning success.');
-    } else if (exitCode !== 0) {
-      core.setFailed('Conftest validation failed.');
-    }
+    await exec.exec(conftestPath, args, {
+      listeners: {
+        stdout: (data: Buffer) => {
+          outputData += data.toString()
+        }
+      }
+    })
   } catch (error) {
-    if (error instanceof Error) {
-      core.setFailed(error.message);
+    core.error(`Conftest validation failed: ${error}`)
+  }
+
+  /*
+  workflow commands
+  https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/workflow-commands-for-github-actions
+
+  https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/workflow-commands-for-github-actions#grouping-log-lines
+  Creates an expandable group in the log.
+  > ::group::{title}
+  > ::endgroup::
+
+  ```bash
+  ::group::Testing 'workflows/initcontainer-without-name.yaml' against 9 policies in namespace 'main'
+  ::error file=workflows/initcontainer-without-name.yaml::metadata.labels must contain a "arceye.naverlabs.io/workflow-type" with a non-empty value.
+  ::warning file=workflows/initcontainer-without-name.yaml::spec.templates[0].container should specify a 'name'.
+  success file=workflows/initcontainer-without-name.yaml 7
+  ::endgroup::
+  ```
+  */
+
+  // Parse JSON output and create annotations
+  const results = JSON.parse(outputData)
+  for (const result of results) {
+    for (const warning of result['warnings']) {
+      const level = 'warning'
+      const conclusion = mapLevelToConclusion(warning)
+      await createAnnotation(
+        warning['msg'],
+        level,
+        result['filename'],
+        conclusion
+      )
+      createWorkflowCommand(level, result['filename'], warning['msg'])
+    }
+    for (const failure of result['failures']) {
+      const level = 'failure'
+      const conclusion = mapLevelToConclusion(failure)
+      await createAnnotation(
+        failure['msg'],
+        level,
+        result['filename'],
+        conclusion
+      )
+      createWorkflowCommand(level, result['filename'], failure['msg'])
     }
   }
 }
 
-run();
+async function createAnnotation(
+  message: string,
+  level: 'notice' | 'warning' | 'failure',
+  filePath: string,
+  conclusion:
+    | 'action_required'
+    | 'cancelled'
+    | 'failure'
+    | 'neutral'
+    | 'success'
+    | 'skipped'
+    | 'stale'
+    | 'timed_out'
+): Promise<void> {
+  const { context } = github
+  const { pull_request } = context.payload
 
+  if (pull_request) {
+    const octokit = github.getOctokit(core.getInput('github_token'))
+    const owner = context.repo.owner
+    const repo = context.repo.repo
+
+    await octokit.rest.checks.create({
+      owner,
+      repo,
+      name: 'Conftest Validation',
+      head_sha: context.sha,
+      conclusion,
+      output: {
+        title: 'Conftest Validation',
+        summary: message,
+        annotations: [
+          {
+            path: filePath,
+            start_line: 1,
+            end_line: 1,
+            annotation_level: level,
+            message
+          }
+        ]
+      }
+    })
+  }
+}
+
+function createWorkflowCommand(
+  level: 'warning' | 'failure',
+  filePath: string,
+  message: string
+): void {
+  if (level === 'failure') {
+    console.log(`::error file=${filePath}::${message}`)
+  } else if (level === 'warning') {
+    console.log(`::warning file=${filePath}::${message}`)
+  }
+}
